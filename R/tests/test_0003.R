@@ -1,0 +1,68 @@
+# Load libraries ---------------------------------------------------------------
+
+library(dplyr)
+library(ggplot2)
+library(ambient)
+
+# Modifiable parameters --------------------------------------------------------
+
+iteration_id <- "test_0003"
+seed_num <- 127813
+initial_grid_size <- 200
+warp_factor <- 100 # lower = more warping
+line_colour <- "#000000"
+# dot_colour <- "#DDDDDD"
+bg_colour <- "#FFFFFF"
+
+# Make some noise --------------------------------------------------------------
+
+# Generate data
+set.seed(seed_num)
+grid <- long_grid(
+  seq(0, 3, length.out = initial_grid_size),
+  seq(0, 3, length.out = initial_grid_size)) %>%
+  mutate(
+    curl = curl_noise(gen_perlin, x = x, y = y)) %>%
+  purrr::reduce(data.frame) %>%
+  rename(x = out, y = elt, curl_x = x, curl_y = y) %>%
+  mutate(
+    x_warped = x + (curl_x / warp_factor),
+    y_warped = y + (curl_y / warp_factor),
+    size = sample(seq(0.5, 3, by = 0.1), n(), replace = TRUE),
+    subset = sample(1:20, n(), replace = TRUE),
+    colour = case_when(
+      x < 0.4            ~ sample(
+        c("#E4F1F1", "#006D77", "#83C5BE"), n(), replace = TRUE,
+        prob = c(0.6, 0.3, 0.1)),
+      x >= 0.4 & x < 0.8 ~ sample(
+        c("#E4F1F1", "#006D77", "#83C5BE"), n(), replace = TRUE,
+        prob = c(0.1, 0.6, 0.3)),
+      TRUE               ~ sample(
+        c("#E4F1F1", "#006D77", "#83C5BE"), n(), replace = TRUE,
+        prob = c(0.3, 0.1, 0.6))))
+
+# Build plot -------------------------------------------------------------------
+
+ggplot() +
+  geom_curve(
+    data = grid,
+    aes(x = x, y = y, xend = x_warped, yend = y_warped, size = size),
+    colour = line_colour, curvature = -0.2) +
+  geom_path(
+    data = grid,
+    aes(x = x_warped, y = y_warped),
+    colour = bg_colour, size = 0.2, linetype = "dotted") +
+  scale_size_identity() +
+  scale_colour_identity() +
+  coord_equal(expand = FALSE) +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.background = element_rect(fill = bg_colour, colour = bg_colour),
+    plot.margin     = margin(100,100,100,100, unit = "pt"))
+
+# Export to file ---------------------------------------------------------------
+
+ggsave(
+  here::here(glue::glue("img/tests/{`iteration_id`}.png")),
+  device = "png", width = 6000, height = 6000, units = "px", dpi = 600)
